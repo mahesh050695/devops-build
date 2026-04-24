@@ -9,18 +9,12 @@ pipeline {
 
     stages {
 
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
-
         stage('Build Image') {
             steps {
                 script {
-                    if (env.BRANCH_NAME == "dev") {
+                    if (env.BRANCH_NAME.contains("dev")) {
                         sh "docker build -t $DEV_IMAGE ."
-                    } else if (env.BRANCH_NAME == "main") {
+                    } else if (env.BRANCH_NAME.contains("main")) {
                         sh "docker build -t $PROD_IMAGE ."
                     }
                 }
@@ -42,9 +36,9 @@ pipeline {
         stage('Push Image') {
             steps {
                 script {
-                    if (env.BRANCH_NAME == "dev") {
+                    if (env.BRANCH_NAME.contains("dev")) {
                         sh "docker push $DEV_IMAGE"
-                    } else if (env.BRANCH_NAME == "main") {
+                    } else if (env.BRANCH_NAME.contains("main")) {
                         sh "docker push $PROD_IMAGE"
                     }
                 }
@@ -54,13 +48,13 @@ pipeline {
         stage('Deploy') {
             steps {
                 script {
-                    if (env.BRANCH_NAME == "dev") {
+                    if (env.BRANCH_NAME.contains("dev")) {
                         sh '''
                         docker stop app || true
                         docker rm app || true
                         docker run -d -p 80:80 --name app $DEV_IMAGE
                         '''
-                    } else if (env.BRANCH_NAME == "main") {
+                    } else if (env.BRANCH_NAME.contains("main")) {
                         sh '''
                         docker stop app || true
                         docker rm app || true
