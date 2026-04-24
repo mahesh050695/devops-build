@@ -9,13 +9,28 @@ pipeline {
 
     stages {
 
+        stage('Detect Branch') {
+            steps {
+                script {
+                    branch = sh(
+                        script: "git rev-parse --abbrev-ref HEAD",
+                        returnStdout: true
+                    ).trim()
+
+                    echo "Branch detected: ${branch}"
+                }
+            }
+        }
+
         stage('Build Image') {
             steps {
                 script {
-                    if (env.BRANCH_NAME.contains("dev")) {
+                    if (branch == "dev") {
                         sh "docker build -t $DEV_IMAGE ."
-                    } else if (env.BRANCH_NAME.contains("main")) {
+                    } else if (branch == "main") {
                         sh "docker build -t $PROD_IMAGE ."
+                    } else {
+                        error "Unknown branch: ${branch}"
                     }
                 }
             }
@@ -36,9 +51,9 @@ pipeline {
         stage('Push Image') {
             steps {
                 script {
-                    if (env.BRANCH_NAME.contains("dev")) {
+                    if (branch == "dev") {
                         sh "docker push $DEV_IMAGE"
-                    } else if (env.BRANCH_NAME.contains("main")) {
+                    } else if (branch == "main") {
                         sh "docker push $PROD_IMAGE"
                     }
                 }
@@ -48,13 +63,13 @@ pipeline {
         stage('Deploy') {
             steps {
                 script {
-                    if (env.BRANCH_NAME.contains("dev")) {
+                    if (branch == "dev") {
                         sh '''
                         docker stop app || true
                         docker rm app || true
                         docker run -d -p 80:80 --name app $DEV_IMAGE
                         '''
-                    } else if (env.BRANCH_NAME.contains("main")) {
+                    } else if (branch == "main") {
                         sh '''
                         docker stop app || true
                         docker rm app || true
