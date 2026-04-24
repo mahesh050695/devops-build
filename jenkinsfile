@@ -1,0 +1,74 @@
+pipeline {
+    agent any
+
+    environment {
+        DEV_IMAGE = "mk5695/dev:latest"
+        PROD_IMAGE = "mk5695/prod:latest"
+        DOCKERHUB_CREDENTIALS = 'dockerhub-creds'
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build Image') {
+            steps {
+                script {
+                    if (env.BRANCH_NAME == "dev") {
+                        sh "docker build -t $DEV_IMAGE ."
+                    } else if (env.BRANCH_NAME == "main") {
+                        sh "docker build -t $PROD_IMAGE ."
+                    }
+                }
+            }
+        }
+
+        stage('Docker Login') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: "$DOCKERHUB_CREDENTIALS",
+                    usernameVariable: 'USERNAME',
+                    passwordVariable: 'PASSWORD'
+                )]) {
+                    sh 'echo $PASSWORD | docker login -u $USERNAME --password-stdin'
+                }
+            }
+        }
+
+        stage('Push Image') {
+            steps {
+                script {
+                    if (env.BRANCH_NAME == "dev") {
+                        sh "docker push $DEV_IMAGE"
+                    } else if (env.BRANCH_NAME == "main") {
+                        sh "docker push $PROD_IMAGE"
+                    }
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                script {
+                    if (env.BRANCH_NAME == "dev") {
+                        sh '''
+                        docker stop app || true
+                        docker rm app || true
+                        docker run -d -p 80:80 --name app $DEV_IMAGE
+                        '''
+                    } else if (env.BRANCH_NAME == "main") {
+                        sh '''
+                        docker stop app || true
+                        docker rm app || true
+                        docker run -d -p 80:80 --name app $PROD_IMAGE
+                        '''
+                    }
+                }
+            }
+        }
+    }
+}
